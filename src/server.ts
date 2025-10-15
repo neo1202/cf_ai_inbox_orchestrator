@@ -21,13 +21,19 @@ import { env } from "cloudflare:workers";
 
 const workersai = createWorkersAI({ binding: env.AI });
 const model = workersai("@cf/deepseek-ai/deepseek-r1-distill-qwen-32b")
+interface EmailSummary {
+  id: string;
+  receivedAt: string; // ISO 格式的時間字串
+  summary: string;    // AI 生成的摘要
+  from: string;       // 寄件人
+  subject: string;    // 主旨
+}
 /**
  * Chat Agent implementation that handles real-time AI chat interactions
  */
 export class Chat extends AIChatAgent<Env> {
-  /**
-   * Handles incoming chat messages and manages the response stream
-   */
+
+ 
   async onChatMessage(
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     _options?: { abortSignal?: AbortSignal }
@@ -35,20 +41,14 @@ export class Chat extends AIChatAgent<Env> {
     // const mcpConnection = await this.mcp.connect(
     //   "https://path-to-mcp-server/sse"
     // );
-
-    // Collect all tools, including MCP tools
     const allTools = {
       ...tools,
       ...this.mcp.getAITools()
     };
-
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
         // Clean up incomplete tool calls to prevent API errors
         const cleanedMessages = cleanupMessages(this.messages);
-
-        // Process any pending tool calls from previous messages
-        // This handles human-in-the-loop confirmations for tools
         const processedMessages = await processToolCalls({
           messages: cleanedMessages,
           dataStream: writer,
